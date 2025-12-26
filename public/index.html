@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Connect 4</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    /* ---------------- BODY & APP ---------------- */
+    body {
+      background: linear-gradient(120deg, #0f172a, #020617);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding-top: 70px;
+    }
+
+    .app {
+      background: #111827;
+      padding: 25px 20px 30px 20px;
+      border-radius: 15px;
+      width: 500px;
+      
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    }
+
+    h2 {
+      margin-bottom: 15px;
+      color: #ffffff;
+      text-shadow: 1px 1px 5px #000;
+    }
+
+    input {
+      padding: 10px;
+      width: 85%;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      
+    }
+
+    button:hover {
+      background: #1d4ed8;
+      transform: translateY(2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .status {
+      margin: 12px 0;
+      font-weight: bold;
+      color: #86e00f;
+    }
+
+    .info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 15px;
+      font-size: 14px;
+      color: #dfe2e6;
+    }
+
+    /* ---------------- BOARD ---------------- */
+    #board table {
+      border-collapse: collapse;
+      margin: 10px auto;
+    }
+
+    #board td {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1e293b; /* base cell color */
+  transition: background 0.2s;
+  position: relative;
+}
+
+.p1, .p2 {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
+}
+
+.p1 {
+  background: #ef4444; /* solid red */
+}
+
+.p2 {
+  background: #facc15; /* solid yellow */
+}
+
+
+    .controls button {
+      width: 40px;
+      height: 40px;
+      font-weight: bold;
+      background: #2563eb;
+      color: white;
+    }
+
+    .legend {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #dce4f0;
+    }
+
+    /* ---------------- OVERLAYS ---------------- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: #020236cc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .overlay-card {
+      background: #1f2937;
+      padding: 25px 20px;
+      border-radius: 12px;
+      width: 320px;
+      text-align: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    }
+
+    .overlay-card h3 {
+      margin-bottom: 15px;
+      color: #fbbf24;
+    }
+
+    .overlay-card button {
+      background: #ef4444;
+      width: 100px;
+    }
+
+    .overlay-card button:hover {
+      background: #dc2626;
+    }
+
+    /* ---------------- LEADERBOARD TABLE ---------------- */
+    .leaderboard-table {
+      width: 100%;
+      margin-top: 12px;
+      border-collapse: collapse;
+    }
+
+    .leaderboard-table th, .leaderboard-table td {
+      padding: 8px;
+      text-align: center;
+      border-bottom: 1px solid #374151;
+    }
+
+    .leaderboard-table th {
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      
+    }
+
+    
+
+    /* ---------------- ANIMATION ---------------- */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.50); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h2>Connect 4</h2>
+
+    <input id="username" placeholder="Enter username" />
+    <button onclick="joinQueue()">Join Queue</button>
+    <button onclick="requestLeaderboard()">🏆 Leaderboard</button>
+
+    <div class="status" id="status">Not connected</div>
+
+    <div class="info">
+      <span>Game: <b id="gameId">-</b></span>
+      <span>Turn: <b id="turn">-</b></span>
+    </div>
+
+    <div id="board"></div>
+    <div class="controls" id="controls"></div>
+
+    <div class="legend">🔴 Player 1 &nbsp;&nbsp; 🟡 Player 2 / Bot</div>
+  </div>
+
+  <!-- GAME RESULT -->
+  <div id="gameOverlay" class="overlay hidden">
+    <div class="overlay-card">
+      <h3 id="result-title"></h3>
+      <button onclick="resetUI()">Play Again</button>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="leaderboardOverlay" class="overlay hidden">
+    <div class="overlay-card">
+      <h3>🏆 Leaderboard</h3>
+      <table class="leaderboard-table" id="leaderboardTable">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            <th>Wins</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn-close" onclick="closeLeaderboard()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io(); 
+    let currentGame = null;
+
+    /* ---------------- CLIENT → SERVER ---------------- */
+    function joinQueue() {
+
+      const username = document.getElementById("username").value;
+      if (!username) {
+        alert("Please enter a username");
+        return;
+      }
+      socket.emit("join_queue", { username });
+      document.getElementById("status").innerText = "Waiting for opponent...";
+    }
+
+    function makeMove(column) {
+      if (!currentGame) return;
+      socket.emit("make_move", { gameId: currentGame.gameId, column });
+    }
+
+    function requestLeaderboard() {
+      socket.emit("get_leaderboard");
+    }
+
+    function closeLeaderboard() {
+      document.getElementById("leaderboardOverlay").classList.add("hidden");
+    }
+
+    /* ---------------- SERVER → CLIENT ---------------- */
+    socket.on("game_start", (game) => {
+      currentGame = game;
+      document.getElementById("status").innerText = "Game Started!";
+      renderGame(game);
+    });
+
+    socket.on("game_update", (game) => {
+      currentGame = game;
+      renderGame(game);
+    });
+
+    socket.on("game_over", (game) => {
+      document.getElementById("result-title").innerText =
+        game.winner === "DRAW" ? "Draw!" : `Winner: ${game.winner}`;
+      document.getElementById("gameOverlay").classList.remove("hidden");
+    });
+
+    socket.on("leaderboard", (data) => {
+      const tbody = document.getElementById("leaderboardTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      data.forEach((player, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${i+1}</td><td>${player.username}</td><td>${player.wins}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById("leaderboardOverlay").classList.remove("hidden");
+    });
+
+    /* ---------------- RENDERING ---------------- */
+    function renderGame(game) {
+      document.getElementById("gameId").innerText = game.gameId;
+      document.getElementById("turn").innerText = game.turn;
+      renderControls();
+      renderBoard(game.board);
+    }
+
+    function renderControls() {
+      const controls = document.getElementById("controls");
+      controls.innerHTML = "";
+      for (let col = 0; col < 7; col++) {
+        const btn = document.createElement("button");
+        btn.innerText = " ^ " + (col + 1);
+        btn.onclick = () => makeMove(col);
+        controls.appendChild(btn);
+      }
+    }
+
+    function renderBoard(board) {
+  const container = document.getElementById("board");
+  container.innerHTML = "";
+  const table = document.createElement("table");
+
+  for (let row = 0; row < 6; row++) {
+    const tr = document.createElement("tr");
+    for (let col = 0; col < 7; col++) {
+      const td = document.createElement("td");
+
+      const disc = document.createElement("div");
+      if (board[row][col] === 1) disc.className = "p1";
+      if (board[row][col] === 2) disc.className = "p2";
+
+      td.appendChild(disc);
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+  container.appendChild(table);
+}
+
+
+    function resetUI() {
+      currentGame = null;
+      document.getElementById("gameOverlay").classList.add("hidden");
+      document.getElementById("status").innerText = "Not connected";
+      document.getElementById("board").innerHTML = "";
+      document.getElementById("controls").innerHTML = "";
+      document.getElementById("gameId").innerText = "-";
+      document.getElementById("turn").innerText = "-";
+    }
+  </script>
+</body>
+</html>

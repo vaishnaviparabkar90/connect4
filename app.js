@@ -1,8 +1,10 @@
 import express from "express";
 
 const app = express();
-app.use(express.static("public")); // serve index.html
-app.get("*", (req, res) => {
+
+app.use(express.static("public")); // serve static files
+
+app.use((req, res) => {
   res.sendFile("index.html", { root: "public" });
 });
 

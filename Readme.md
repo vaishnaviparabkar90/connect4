@@ -2,6 +2,7 @@
 ```
 https://connect4-p15g.onrender.com/
 
+
 ```
 
 
@@ -40,11 +41,8 @@ UUID
 
 Frontend
 ```
-HTML
 
-CSS
-
-JavaScript
+React Js 
 ```
 
 ## 🚀 Getting Started
